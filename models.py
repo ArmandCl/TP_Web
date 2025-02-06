@@ -6,7 +6,7 @@ class BaseModel(Model):
     class Meta:
         database = db
 
-class Product(BaseModel):
+class Products(BaseModel):
     name = CharField()
     price = FloatField()
     description = CharField() 

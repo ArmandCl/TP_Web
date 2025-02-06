@@ -1,9 +1,40 @@
 from flask import Flask, render_template
 from flask_restful import Api
-from models import db, Product
+import urllib.request
+import json
+from models import db, Products
 from ressources import ProductResource
 
 app = Flask(__name__)
+
+PRODUCTS_URL = "http://dimensweb.uqac.ca/~jgnault/shops/products/"
+
+def fetch_and_store_products():
+    """Récupère les produits de l'API externe et les stocke en base de données."""
+    try:
+        with urllib.request.urlopen(PRODUCTS_URL) as response:
+            data = json.load(response)  # Charge directement en JSON
+
+        products = data.get("products", [])
+
+        with db.atomic():  # Optimisation des requêtes SQL
+            for product in products:
+                Products.get_or_create(
+                    id=product["id"],
+                    defaults={
+                        "name": product["name"],
+                        "description": product.get("description", ""),
+                        "price": product["price"],
+                        "in_stock": product["in_stock"],
+                        "weight": product["weight"],
+                        "image": product["image"]
+                    }
+                )
+
+        print(" Produits récupérés et stockés avec succès !")
+
+    except Exception as e:
+        print(f" Erreur lors de la récupération des produits : {e}")
 
 # Initialisation de l'API REST
 api = Api(app)
@@ -13,19 +44,16 @@ api.add_resource(ProductResource, '/products', '/products/<int:product_id>')
 def hello_world():
     return render_template('hello.html')
 
-# Création de la base de données
+# Création de la base de données et récupération des produits
 with app.app_context():
     db.connect()
-    db.create_tables([Product])
+    db.create_tables([Products])
 
-    # Ajout de données de test
-    if not Product.select().exists():
-        Product.create(name="Banane", price=1.5, description="Fruit jaune", weight=0.2, image="banane.jpg")
-        Product.create(name="Pomme", price=2.0, description="Fruit rouge", weight=0.3, image="pomme.jpg")
-        Product.create(name="Poire", price=1.8, description="Fruit vert", weight=0.25, image="poire.jpg")
+    # Récupération et stockage des produits de l'API externe
+    fetch_and_store_products()
 
-    # Affichage des produits pour vérifier
-    for product in Product.select():
+    # Affichage des produits stockés
+    for product in Products.select():
         print(f"{product.id}: {product.name} - {product.price} - {product.description}")
 
 if __name__ == '__main__':

@@ -1,19 +1,20 @@
 from flask import jsonify, request
 from flask_restful import Resource
-from models import Product, db
+from models import Products, db
 from playhouse.shortcuts import model_to_dict
 
 class ProductResource(Resource):
 
     def get(self, product_id=None):
         if product_id:
-            product = Product.get_or_none(Product.id == product_id)
+            product = Products.get_or_none(Products.id == product_id)
             if product:
                 return jsonify(model_to_dict(product))
             return {"error": "Product not found"}, 404
         else:
-            all_products = Product.select()
+            all_products = Products.select()
             return jsonify([model_to_dict(product) for product in all_products])
+  
         
     def post(self):
         if not request.is_json:
@@ -32,7 +33,7 @@ class ProductResource(Resource):
             except ValueError:
                 return {"error": "Invalid 'price', must be a number"}, 400
 
-            new_product = Product.create(
+            new_product = Products.create(
                 name=new_product_data['name'],
                 price=price,
                 description=new_product_data.get('description', ''),
@@ -47,12 +48,13 @@ class ProductResource(Resource):
             print(f"Erreur lors de l'ajout du produit : {e}")
             return {"error": str(e)}, 500
         
+        
     def put(self, product_id):
         if not request.is_json:
             return {"error": "Invalid input, JSON required"}, 400
 
         try:
-            product = Product.get_or_none(Product.id == product_id)
+            product = Products.get_or_none(Products.id == product_id)
             if not product:
                 return {"error": "Product not found"}, 404
 
@@ -84,7 +86,7 @@ class ProductResource(Resource):
             return {"error": str(e)}, 500
         
     def delete(self, product_id):
-        product = Product.get_or_none(Product.id == product_id)
+        product = Products.get_or_none(Products.id == product_id)
         if not product:
             return {"error": "Product not found"}, 404
 
