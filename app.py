@@ -2,8 +2,8 @@ from flask import Flask, render_template
 from flask_restful import Api
 import urllib.request
 import json
-from models import db, Products
-from ressources import ProductResource
+from models import Orders, db, Products
+from ressources import OrderResource, ProductResource
 
 app = Flask(__name__)
 
@@ -39,6 +39,8 @@ def fetch_and_store_products():
 # Initialisation de l'API REST
 api = Api(app)
 api.add_resource(ProductResource, '/products', '/products/<int:product_id>')
+api.add_resource(OrderResource, '/orders', '/orders/<int:order_id>')
+#api.add_resource(OrderResource, '/orders')
 
 @app.route('/')
 def hello_world():
@@ -47,7 +49,9 @@ def hello_world():
 # Création de la base de données et récupération des produits
 with app.app_context():
     db.connect()
+    db.drop_tables([Products, Orders])
     db.create_tables([Products])
+    db.create_tables([Orders])
 
     # Récupération et stockage des produits de l'API externe
     fetch_and_store_products()
@@ -57,4 +61,8 @@ with app.app_context():
         print(f"{product.id}: {product.name} - {product.price} - {product.description}")
 
 if __name__ == '__main__':
+    print("Routes disponibles :")
+    for rule in app.url_map.iter_rules():
+        print(rule)
     app.run(debug=True)
+    
