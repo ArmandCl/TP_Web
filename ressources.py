@@ -9,11 +9,12 @@ class ProductResource(Resource):
         if product_id:
             product = Products.get_or_none(Products.id == product_id)
             if product:
-                return jsonify(model_to_dict(product))
+                return jsonify({"product": model_to_dict(product)})
             return {"error": "Product not found"}, 404
         else:
             all_products = Products.select()
-            return jsonify([model_to_dict(product) for product in all_products])
+            products_list = [model_to_dict(product) for product in all_products]
+            return jsonify({"products": products_list})
 
     def post(self):
         if not request.is_json:
@@ -163,21 +164,23 @@ class OrderResource(Resource):
 
             # Construction de la réponse
             order_data = {
-                "id": order.id,
-                "total_price": total_price,
-                "total_price_tax": total_price_tax,
-                "email": order.email,
-                "credit_card": json.loads(order.credit_card) if order.credit_card else {},
-                "shipping_information": shipping_info,
-                "paid": order.paid,
-                "transaction": json.loads(order.transaction) if order.transaction else {},
-                "product": {
-                    "id": order.product.id,
-                    "name": order.product.name,
-                    "price": order.product.price,
-                    "quantity": order.quantity
-                },
-                "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
+                "order": {
+                    "id": order.id,
+                    "total_price": total_price,
+                    "total_price_tax": total_price_tax,
+                    "email": order.email,
+                    "credit_card": json.loads(order.credit_card) if order.credit_card else {},
+                    "shipping_information": shipping_info,
+                    "paid": order.paid,
+                    "transaction": json.loads(order.transaction) if order.transaction else {},
+                    "product": {
+                        "id": order.product.id,
+                        "name": order.product.name,
+                        "price": order.product.price,
+                        "quantity": order.quantity
+                    },
+                    "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
+                }
             }
 
             return jsonify(order_data)
@@ -194,7 +197,8 @@ class OrderResource(Resource):
                 tax_rate = self.get_tax_rate(province)
                 total_price_tax = total_price * (1 + tax_rate)
 
-                orders_list.append({
+            orders_list.append({
+                "order": {
                     "id": order.id,
                     "total_price": total_price,
                     "total_price_tax": total_price_tax,
@@ -207,7 +211,8 @@ class OrderResource(Resource):
                         "quantity": order.quantity
                     },
                     "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
-                })
+                }
+            })
 
             return jsonify(orders_list)
     
@@ -252,21 +257,23 @@ class OrderResource(Resource):
 
         # Retourner les informations mises à jour de la commande
         order_data = {
-            "id": order.id,
-            "total_price": order.product.price * order.quantity,
-            "total_price_tax": (order.product.price * order.quantity) * (1 + self.get_tax_rate(shipping_info.get("province", ""))),
-            "email": order.email,
-            "credit_card": json.loads(order.credit_card) if order.credit_card else {},
-            "shipping_information": json.loads(order.shipping_information),
-            "paid": order.paid,
-            "transaction": json.loads(order.transaction) if order.transaction else {},
-            "product": {
-                "id": order.product.id,
-                "name": order.product.name,
-                "price": order.product.price,
-                "quantity": order.quantity
-            },
-            "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
+            "order": {
+                "id": order.id,
+                "total_price": order.product.price * order.quantity,
+                "total_price_tax": (order.product.price * order.quantity) * (1 + self.get_tax_rate(shipping_info.get("province", ""))),
+                "email": order.email,
+                "credit_card": json.loads(order.credit_card) if order.credit_card else {},
+                "shipping_information": json.loads(order.shipping_information),
+                "paid": order.paid,
+                "transaction": json.loads(order.transaction) if order.transaction else {},
+                "product": {
+                    "id": order.product.id,
+                    "name": order.product.name,
+                    "price": order.product.price,
+                    "quantity": order.quantity
+                },
+                "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
+            }
         }
 
         return jsonify(order_data)
