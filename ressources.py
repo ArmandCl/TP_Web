@@ -210,6 +210,66 @@ class OrderResource(Resource):
                 })
 
             return jsonify(orders_list)
+    
+    def put(self, order_id):
+        data = request.get_json()
+
+        # Vérifier que la commande existe
+        order = Orders.get_or_none(Orders.id == order_id)
+        if not order:
+            return {"error": "Order not found"}, 404
+
+        # Vérifier que les champs obligatoires sont présents
+        if "email" not in data or "shipping_information" not in data:
+            return {
+                "errors": {
+                    "order": {
+                        "code": "missing-fields",
+                        "name": "Les champs 'email' et 'shipping_information' sont obligatoires"
+                    }
+                }
+            }, 422
+
+        shipping_info = data["shipping_information"]
+
+        # Vérifier que tous les champs de shipping_information sont présents
+        required_shipping_fields = ["country", "address", "postal_code", "city", "province"]
+        for field in required_shipping_fields:
+            if field not in shipping_info:
+                return {
+                    "errors": {
+                        "shipping_information": {
+                            "code": "missing-fields",
+                            "name": f"Le champ '{field}' est obligatoire dans 'shipping_information'"
+                        }
+                    }
+                }, 422
+
+        # Mettre à jour les champs autorisés
+        order.email = data["email"]
+        order.shipping_information = json.dumps(shipping_info)
+        order.save()
+
+        # Retourner les informations mises à jour de la commande
+        order_data = {
+            "id": order.id,
+            "total_price": order.product.price * order.quantity,
+            "total_price_tax": (order.product.price * order.quantity) * (1 + self.get_tax_rate(shipping_info.get("province", ""))),
+            "email": order.email,
+            "credit_card": json.loads(order.credit_card) if order.credit_card else {},
+            "shipping_information": json.loads(order.shipping_information),
+            "paid": order.paid,
+            "transaction": json.loads(order.transaction) if order.transaction else {},
+            "product": {
+                "id": order.product.id,
+                "name": order.product.name,
+                "price": order.product.price,
+                "quantity": order.quantity
+            },
+            "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
+        }
+
+        return jsonify(order_data)
 
     def get_tax_rate(self, province):
         tax_rates = {
