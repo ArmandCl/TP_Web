@@ -45,6 +45,11 @@ api.add_resource(OrderResource, '/order', '/order/<int:order_id>')
 def hello_world():
     return render_template('hello.html')
 
+@app.route('/products_table')
+def products():
+    products = Products.select()
+    return render_template('products.html', products=products)
+
 # Création de la base de données et récupération des produits
 with app.app_context():
     db.connect()
