@@ -3,6 +3,7 @@ from flask_restful import Resource
 from models import Products, Orders
 from playhouse.shortcuts import model_to_dict
 import json
+from functions import process_payment, validate_credit_card
 
 class ProductResource(Resource):
     def get(self, product_id=None):
@@ -224,20 +225,31 @@ class OrderResource(Resource):
         if not order:
             return {"error": "Order not found"}, 404
 
-        # Vérifier que les champs obligatoires sont présents
-        if "email" not in data or "shipping_information" not in data:
+        # Extraire les données de la commande
+        order_data = data.get("order")
+        if not order_data:
             return {
                 "errors": {
                     "order": {
                         "code": "missing-fields",
-                        "name": "Les champs 'email' et 'shipping_information' sont obligatoires"
+                        "name": "Les informations du client sont nécessaires avant d'appliquer une carte de crédit"
                     }
                 }
             }, 422
 
-        shipping_info = data["shipping_information"]
+        # Vérifier que l'email et les informations de livraison sont présents
+        if not order_data.get("email") or not order_data.get("shipping_information"):
+            return {
+                "errors": {
+                    "order": {
+                        "code": "missing-fields",
+                        "name": "Les informations du client sont nécessaires avant d'appliquer une carte de crédit"
+                    }
+                }
+            }, 422
 
-        # Vérifier que tous les champs de shipping_information sont présents
+        # Vérifier que les champs obligatoires de shipping_information sont présents
+        shipping_info = order_data.get("shipping_information")
         required_shipping_fields = ["country", "address", "postal_code", "city", "province"]
         for field in required_shipping_fields:
             if field not in shipping_info:
@@ -250,10 +262,52 @@ class OrderResource(Resource):
                     }
                 }, 422
 
-        # Mettre à jour les champs autorisés
-        order.email = data["email"]
+        # Mettre à jour les informations de la commande
+        order.email = order_data["email"]
         order.shipping_information = json.dumps(shipping_info)
         order.save()
+
+        # Vérifier si la requête contient des informations de carte de crédit (paiement)
+        credit_card = data.get("credit_card")
+        if credit_card:
+            # Vérifier si la commande a déjà été payée
+            if order.paid:
+                return {
+                    "errors": {
+                        "order": {
+                            "code": "already-paid",
+                            "name": "La commande a déjà été payée."
+                        }
+                    }
+                }, 422
+
+            # Valider les informations de la carte de crédit
+            if not validate_credit_card(credit_card):
+                return {
+                    "errors": {
+                        "credit_card": {
+                            "code": "invalid-fields",
+                            "name": "Les informations de la carte de crédit sont invalides ou incomplètes"
+                        }
+                    }
+                }, 422
+
+            # Calculer le montant total avec taxes
+            total_price = order.product.price * order.quantity
+            tax_rate = self.get_tax_rate(shipping_info.get("province", ""))
+            total_price_tax = total_price * (1 + tax_rate)
+            amount_charged = total_price_tax
+
+            # Envoyer la requête à l'API de paiement distante
+            transaction_data = process_payment(credit_card, amount_charged)
+            if "errors" in transaction_data:
+                return transaction_data, 422
+
+            # Mettre à jour la commande avec les informations de la transaction
+            order.paid = True
+            order.credit_card = json.dumps(transaction_data.get("credit_card", {}))
+            order.transaction = json.dumps(transaction_data.get("transaction", {}))
+            order.save()
 
         # Retourner les informations mises à jour de la commande
         order_data = {

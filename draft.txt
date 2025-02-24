@@ -1,0 +1,6 @@
+est ce que pour les méthodes de paiement, on ajoute les informations de carte avec la commande PUT ?
+
+Où est ce qu'on fait des tests ?
+
+
+pip install -r .\requirement.txt
