@@ -61,8 +61,8 @@ with app.app_context():
     fetch_and_store_products()
 
     # Affichage des produits stockés
-    for product in Products.select():
-        print(f"{product.id}: {product.name} - {product.price} - {product.description}")
+    #for product in Products.select():
+    #    print(f"{product.id}: {product.name} - {product.price} - {product.description}")
 
 if __name__ == '__main__':
     app.run(debug=True)
