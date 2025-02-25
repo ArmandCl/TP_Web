@@ -3,7 +3,9 @@ from flask_restful import Resource
 from models import Products, Orders
 from playhouse.shortcuts import model_to_dict
 import json
-from functions import process_payment, validate_credit_card
+import requests
+
+API_PAYEMENT = "http://dimensweb.uqac.ca/~jgnault/shops/payment/"
 
 class ProductResource(Resource):
     def get(self, product_id=None):
@@ -220,11 +222,12 @@ class OrderResource(Resource):
     def put(self, order_id):
         data = request.get_json()
 
-        # Vérifier que la commande existe
+        # Vérifier si la commande existe
         order = Orders.get_or_none(Orders.id == order_id)
         if not order:
             return {"error": "Order not found"}, 404
 
+<<<<<<< HEAD
         # Extraire les données de la commande
         order_data = data.get("order")
         if not order_data:
@@ -234,9 +237,51 @@ class OrderResource(Resource):
                         "code": "missing-fields",
                         "name": "Les informations du client sont nécessaires avant d'appliquer une carte de crédit"
                     }
-                }
-            }, 422
+=======
+        # Cas 1: Ajout des infos client (email + shipping_information)
+        if "email" in data and "shipping_information" in data:
+            shipping_info = data["shipping_information"]
 
+            # Vérifier que tous les champs de shipping_information sont présents
+            required_fields = ["country", "address", "postal_code", "city", "province"]
+            for field in required_fields:
+                if field not in shipping_info:
+                    return {
+                        "errors": {
+                            "shipping_information": {
+                                "code": "missing-fields",
+                                "name": f"Le champ '{field}' est obligatoire dans 'shipping_information'"
+                            }
+                        }
+                    }, 422
+
+            # Mettre à jour la commande
+            order.email = data["email"]
+            order.shipping_information = json.dumps(shipping_info)
+            order.save()
+
+            return jsonify({
+                "order": {
+                    "id": order.id,
+                    "total_price": order.product.price * order.quantity,
+                    "total_price_tax": (order.product.price * order.quantity) * (1 + self.get_tax_rate(shipping_info["province"])),
+                    "email": order.email,
+                    "credit_card": json.loads(order.credit_card) if order.credit_card else {},
+                    "shipping_information": json.loads(order.shipping_information),
+                    "paid": order.paid,
+                    "transaction": json.loads(order.transaction) if order.transaction else {},
+                    "product": {
+                        "id": order.product.id,
+                        "name": order.product.name,
+                        "price": order.product.price,
+                        "quantity": order.quantity
+                    },
+                    "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
+>>>>>>> API_payement
+                }
+            })
+
+<<<<<<< HEAD
         # Vérifier que l'email et les informations de livraison sont présents
         if not order_data.get("email") or not order_data.get("shipping_information"):
             return {
@@ -253,15 +298,22 @@ class OrderResource(Resource):
         required_shipping_fields = ["country", "address", "postal_code", "city", "province"]
         for field in required_shipping_fields:
             if field not in shipping_info:
+=======
+        # Cas 2: Ajout des infos de carte de crédit (paiement)
+        if "credit_card" in data:
+            # Vérifier si l'email et l'adresse de livraison sont présents
+            if not order.email or not order.shipping_information:
+>>>>>>> API_payement
                 return {
                     "errors": {
-                        "shipping_information": {
+                        "order": {
                             "code": "missing-fields",
-                            "name": f"Le champ '{field}' est obligatoire dans 'shipping_information'"
+                            "name": "Les informations du client sont nécessaires avant d'appliquer une carte de crédit"
                         }
                     }
                 }, 422
 
+<<<<<<< HEAD
         # Mettre à jour les informations de la commande
         order.email = order_data["email"]
         order.shipping_information = json.dumps(shipping_info)
@@ -327,10 +379,77 @@ class OrderResource(Resource):
                     "quantity": order.quantity
                 },
                 "shipping_price": self.calculate_shipping_price(order.product.weight * order.quantity)
-            }
-        }
+=======
+            # Vérifier si la commande est déjà payée
+            if order.paid:
+                return {
+                    "errors": {
+                        "order": {
+                            "code": "already-paid",
+                            "name": "La commande a déjà été payée."
+                        }
+                    }
+                }, 422
 
-        return jsonify(order_data)
+            # Préparer la requête de paiement
+            credit_card_info = data["credit_card"]
+            total_price_tax = order.product.price * order.quantity * (1 + self.get_tax_rate(json.loads(order.shipping_information).get("province", "")))
+            shipping_price = self.calculate_shipping_price(order.product.weight * order.quantity)
+            amount_charged = total_price_tax + shipping_price
+
+            payment_data = {
+                "credit_card": credit_card_info,
+                "amount_charged": amount_charged
+>>>>>>> API_payement
+            }
+
+            # Envoyer la requête à l'API de paiement
+            try:
+                response = requests.post(API_PAYEMENT, json=payment_data)
+                response_data = response.json()
+
+                if response.status_code == 200:
+                    # Mettre à jour la commande avec les infos de paiement
+                    order.credit_card = json.dumps({
+                        "name": credit_card_info["name"],
+                        "first_digits": credit_card_info["number"][:4],
+                        "last_digits": credit_card_info["number"][-4:],
+                        "expiration_year": credit_card_info["expiration_year"],
+                        "expiration_month": credit_card_info["expiration_month"]
+                    })
+                    order.transaction = json.dumps(response_data["transaction"])
+                    order.paid = True
+                    order.save()
+
+                    return jsonify({
+                        "order": {
+                            "id": order.id,
+                            "total_price": order.product.price * order.quantity,
+                            "total_price_tax": total_price_tax,
+                            "email": order.email,
+                            "credit_card": json.loads(order.credit_card),
+                            "shipping_information": json.loads(order.shipping_information),
+                            "paid": order.paid,
+                            "transaction": json.loads(order.transaction),
+                            "product": {
+                                "id": order.product.id,
+                                "name": order.product.name,
+                                "price": order.product.price,
+                                "quantity": order.quantity
+                            },
+                            "shipping_price": shipping_price
+                        }
+                    })
+
+                else:
+                    return response_data, response.status_code
+
+            except requests.RequestException as e:
+                return {"error": f"Erreur de connexion à l'API de paiement: {str(e)}"}, 500
+
+        return {"error": "Aucune action définie pour cette requête"}, 400
+
+
 
     def get_tax_rate(self, province):
         tax_rates = {
