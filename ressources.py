@@ -5,7 +5,7 @@ from playhouse.shortcuts import model_to_dict
 import json
 import requests
 
-API_PAYEMENT = "http://dimensweb.uqac.ca/~jgnault/shops/payment/"
+API_PAYEMENT = "https://dimensweb.uqac.ca/~jgnault/shops/pay/"
 
 class ProductResource(Resource):
     def get(self, product_id=None):

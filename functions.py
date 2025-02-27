@@ -3,8 +3,8 @@ import json
 from models import Products, db
 
 
-PAIEMENT_URL = "http://dimensweb.uqac.ca/~jgnault/shops/pay/"
-PRODUCTS_URL = "http://dimensweb.uqac.ca/~jgnault/shops/products/"
+PAIEMENT_URL = "https://dimensweb.uqac.ca/~jgnault/shops/pay/"
+PRODUCTS_URL = "https://dimensweb.uqac.ca/~jgnault/shops/products/"
 
 def fetch_and_store_products():
     """Récupère les produits de l'API externe et les stocke en base de données."""
