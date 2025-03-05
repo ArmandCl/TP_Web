@@ -19,6 +19,8 @@ def client():
             db.create_tables([Products]) 
         yield client
 
+# Fixtures pour les tests de produits
+
 @pytest.fixture
 def add_products(client):
     """Fixture pour ajouter des produits avant les tests."""
@@ -46,6 +48,21 @@ def add_out_of_stock_product(client):
     )
     yield product  # Passe le produit aux tests
     product.delete_instance()  # Nettoyage après les tests
+
+# Fixtures pour les tests de commandes
+
+@pytest.fixture
+def valid_order(client, add_products):
+    """Créer une commande valide pour les tests."""
+    product = add_products[0]  
+    response = client.post("/order", json={"product": {"id": product.id, "quantity": 1}})
+    assert response.status_code == 201  
+
+    order_data = json.loads(response.data)
+    yield order_data["order_id"]  # Retourner l'ID de la commande créée
+
+
+# Fixtures pour les tests de paiement
 
 @pytest.fixture
 def add_unpaid_order(client):
