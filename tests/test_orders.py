@@ -36,10 +36,10 @@ def test_create_order_quantity_zero(client):
         }
     }
 
-def test_create_order_out_of_stock(client):
+def test_create_order_out_of_stock(client, add_out_of_stock_product):
     """Tester la création d'une commande avec un produit hors stock"""
-    response = client.post("/order", json={"product": {"id": 9999, "quantity": 1}})
-    assert response.status_code == 422  # Modifié pour coller à l'énoncé
+    response = client.post("/order", json={"product": {"id": add_out_of_stock_product.id, "quantity": 1}})
+    assert response.status_code == 422  
     data = json.loads(response.data)
     assert data == {
         "errors": {

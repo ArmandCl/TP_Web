@@ -128,7 +128,14 @@ class OrderResource(Resource):
         # Vérifier si le produit existe
         product = Products.get_or_none(Products.id == product_id)
         if not product:
-            return {"error": "Product not found"}, 404
+            return {
+                "errors": {
+                    "product": {
+                        "code": "not-found",
+                        "name": "Le produit demandé n'existe pas"
+                    }
+                }
+            }, 404  
 
         # Vérifier si le produit est en stock
         if not product.in_stock:
